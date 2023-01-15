@@ -15,7 +15,7 @@ import math
 # Fx. friktions konstanter/parameter, masser, længder, radier, ...
 
 # Changable parameters
-run_number = 8  # 1-16
+run_number = 12  # 1-16
 rope_length = 7  # m
 
 
@@ -193,3 +193,5 @@ plt.plot(df_run['t'], df_run['w'], label='Forsøg')
 plt.plot(df_sim['t'], df_sim['w'], label='Simulation')
 plt.legend()
 plt.grid()
+plt.xlabel('Time [s]')
+plt.ylabel('Angular velocity [rad/s]')
