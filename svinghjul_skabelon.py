@@ -15,11 +15,20 @@ import math
 # Fx. friktions konstanter/parameter, masser, længder, radier, ...
 
 # Changable parameters
-mass_weight = 0.5  # kg
-wheel_in_use = True  # True or False
-rope_length = 6.5  # m
+run_number = 8  # 1-16
+rope_length = 7  # m
+
+
+# Load test parameters from index.csv
+df_index = pd.read_csv('index.csv')
+df_index.set_index('Run', inplace=True)
+mass_weight = df_index.loc[run_number, 'Mass']
+wheel_in_use = df_index.loc[run_number, 'Wheel']
 
 # friction parameters
+friction_constant = -0.008  # N/(kg*m/s^2)
+friction_constant_2 = 0.027  # N/(kg*m/s^2)
+
 TC = 0.018  # Nm
 Tbrk = TC+0.01  # Nm
 breakaway = 1  # rad/s
@@ -96,22 +105,27 @@ mass_test_construction = mass_axis + mass_pulley + mass_end_disc * \
     number_of_end_discs + mass_nut * number_of_nuts + mass_washer * number_of_washers
 
 
-def friction(w):
-    return sqrt2e * (Tbrk - TC) * math.exp(-(w/wst)**2) * w/wst + TC * math.tanh(w/wcoul) + viscosity * w
+def friction(w, wheight_active):
+    mass_total = mass_test_construction + mass_wheel_total * \
+        wheel_in_use + mass_weight*wheight_active
+    friction_constant_mass = friction_constant_2 + \
+        friction_constant * mass_total**(1/2)
+    return friction_constant_mass * (mass_test_construction + mass_wheel_total*wheel_in_use + mass_weight*wheight_active) * gravity * radius_bearing_pitch * w
+    # return sqrt2e * (Tbrk - TC) * math.exp(-(w/wst)**2) * w/wst + TC * math.tanh(w/wcoul) + viscosity * w
 
 # Definere en funktion som beregner accelerationen indtil lodet rammer gulven
 
 
 def acceleration(w):
     Ta = mass_weight * gravity * radius_pulley_outer
-    Tf = friction(w)
+    Tf = friction(w, True)
     return (Ta - Tf) / inertia_total
 
 # Definere en funktion som beregner decelerationen efter lodet ramte gulven
 
 
 def deceleration(w):
-    Tf = friction(w)
+    Tf = friction(w, False)
     return -Tf / inertia_total
 
 # Definere Eulers metode til integration
@@ -157,7 +171,7 @@ def eulersMethod(f1, f2, t0, w0, h, tn):
 
 
 # %% Indlæse data fra jeres forsøg (Husk: funktionen pd.read_csv())
-df_run = pd.read_csv('experiments/9.csv')
+df_run = pd.read_csv('experiments/{}.csv'.format(run_number))
 df_run = df_run.rename(
     columns={'rotation number': 'n', 'time after start [s]': 't'})
 df_run.drop(df_run.tail(1).index, inplace=True)
