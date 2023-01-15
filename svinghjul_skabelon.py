@@ -26,13 +26,7 @@ mass_weight = df_index.loc[run_number, 'Mass']
 wheel_in_use = df_index.loc[run_number, 'Wheel']
 
 # friction parameters
-friction_constant = -0.008  # N/(kg*m/s^2)
-friction_constant_2 = 0.027  # N/(kg*m/s^2)
-
-TC = 0.018  # Nm
-Tbrk = TC+0.01  # Nm
-breakaway = 1  # rad/s
-viscosity = 0.0033  # Nm/(rad/s)
+friction_constant = 0.025  # N/(m/s^2)
 
 # Permanent constants
 mass_steel = 4.048  # kg
@@ -70,10 +64,6 @@ number_of_washers = 12
 number_of_chips = 4*16
 
 gravity = 9.82  # m/s^2
-wst = breakaway * math.sqrt(2)
-wcoul = breakaway/10
-sqrt2e = math.sqrt(2*math.e)
-
 
 # Beregn inertimomentet og drejningsmomentet
 # Inertia of test construction
@@ -105,27 +95,24 @@ mass_test_construction = mass_axis + mass_pulley + mass_end_disc * \
     number_of_end_discs + mass_nut * number_of_nuts + mass_washer * number_of_washers
 
 
-def friction(w, wheight_active):
+def friction(omega, weight_active):
     mass_total = mass_test_construction + mass_wheel_total * \
-        wheel_in_use + mass_weight*wheight_active
-    friction_constant_mass = friction_constant_2 + \
-        friction_constant * mass_total**(1/2)
-    return friction_constant_mass * (mass_test_construction + mass_wheel_total*wheel_in_use + mass_weight*wheight_active) * gravity * radius_bearing_pitch * w
-    # return sqrt2e * (Tbrk - TC) * math.exp(-(w/wst)**2) * w/wst + TC * math.tanh(w/wcoul) + viscosity * w
+        wheel_in_use + mass_weight * weight_active
+    return friction_constant * mass_total * omega * radius_bearing_pitch
 
 # Definere en funktion som beregner accelerationen indtil lodet rammer gulven
 
 
-def acceleration(w):
+def acceleration(omega):
     Ta = mass_weight * gravity * radius_pulley_outer
-    Tf = friction(w, True)
-    return (Ta - Tf) / inertia_total
+    Tf = friction(omega, True)
+    return (Ta - Tf) / (inertia_total + mass_weight * radius_pulley_outer**2)
 
 # Definere en funktion som beregner decelerationen efter lodet ramte gulven
 
 
-def deceleration(w):
-    Tf = friction(w, False)
+def deceleration(omega):
+    Tf = friction(omega, False)
     return -Tf / inertia_total
 
 # Definere Eulers metode til integration
