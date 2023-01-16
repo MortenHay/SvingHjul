@@ -15,7 +15,7 @@ import math
 # Fx. friktions konstanter/parameter, masser, længder, radier, ...
 
 # Changable parameters
-run_number = 12  # 1-16
+run_number = 10  # 1-16
 rope_length = 7  # m
 
 
