@@ -9,15 +9,22 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import os
 
 # %% Definere konstanter og parameter
 # Konstanter som i skal bruge i jeres beregninger
 # Fx. friktions konstanter/parameter, masser, længder, radier, ...
 
 # Changable parameters
-run_number = 10  # 1-16
-rope_length = 7  # m
+run_number = 16  # 1-16
+rope_length = 5.9  # m
+rope_auto = True
+write_out = True
+dir = 'figures/{}'.format(run_number)
 
+# friction parameters
+friction_constant = 0.26  # Ns
+friction_constant_2 = 0.027
 
 # Load test parameters from index.csv
 df_index = pd.read_csv('index.csv')
@@ -25,8 +32,6 @@ df_index.set_index('Run', inplace=True)
 mass_weight = df_index.loc[run_number, 'Mass']
 wheel_in_use = df_index.loc[run_number, 'Wheel']
 
-# friction parameters
-friction_constant = 0.025  # N/(m/s^2)
 
 # Permanent constants
 mass_steel = 4.048  # kg
@@ -65,6 +70,7 @@ number_of_chips = 4*16
 
 gravity = 9.82  # m/s^2
 
+
 # Beregn inertimomentet og drejningsmomentet
 # Inertia of test construction
 inertia_axis = mass_axis*radius_axis**2
@@ -98,7 +104,7 @@ mass_test_construction = mass_axis + mass_pulley + mass_end_disc * \
 def friction(omega, weight_active):
     mass_total = mass_test_construction + mass_wheel_total * \
         wheel_in_use + mass_weight * weight_active
-    return friction_constant * mass_total * omega * radius_bearing_pitch
+    return (friction_constant * omega + friction_constant_2 * mass_total * gravity) * radius_bearing_pitch
 
 # Definere en funktion som beregner accelerationen indtil lodet rammer gulven
 
@@ -141,16 +147,16 @@ def eulersMethod(f1, f2, t0, w0, h, tn):
 
     w[0] = w0
     weight_active = True
-    total_stretch = w[0] * radius_pulley_outer * t0  # m
+    total_stretch = 0  # m
 
     # Lave en for-loop til at beregne vinkelhastighedens udvikling
     # Husk at vinkelacceleration ændre sig nå lodet rammer jorden
     # hvordan skal i tage højde for det i for-loopet?
 
     for k in range(1, len(t)):
-        w[k] = w[k-1] + acceleration(w[k-1]) * \
-            h if weight_active else w[k-1] + deceleration(w[k-1]) * h
-        total_stretch += w[k] * radius_pulley_outer * h
+        w[k] = w[k-1] + f1(w[k-1]) * \
+            h if weight_active else w[k-1] + f2(w[k-1]) * h
+        total_stretch += w[k] * h * radius_pulley_outer
         weight_active = False if total_stretch >= rope_length else True
     # Retunere resultaterne
 
@@ -170,6 +176,13 @@ df_run['dt'] = df_run['t'] - df_run['t'].shift(1)
 df_run['w'] = 2*math.pi/df_run['dt']
 df_run.reset_index(drop=True)
 
+# Calculate rope length
+df_run['dw'] = df_run['w'] - df_run['w'].shift(1)
+df_run['dw'] = df_run['dw'].fillna(0)
+if rope_auto:
+    rope_length = (df_run[df_run['dw'] > 0]['w'].count() -
+                   1) * radius_pulley_outer * 2 * math.pi
+
 # %% Kald jeres Eulers-metode funktion til at køre en simulation
 t, w = eulersMethod(acceleration, deceleration,
                     df_run['t'].iloc[1], df_run['w'].iloc[1], 0.001, df_run['t'].iloc[-1])
@@ -178,7 +191,27 @@ df_sim = pd.DataFrame({'t': t, 'w': w})
 # Plot Forsøg
 plt.plot(df_run['t'], df_run['w'], label='Forsøg')
 plt.plot(df_sim['t'], df_sim['w'], label='Simulation')
-plt.legend()
+plt.legend(fontsize=14)
 plt.grid()
-plt.xlabel('Time [s]')
-plt.ylabel('Angular velocity [rad/s]')
+plt.xlabel('Time [s]', fontsize=18)
+plt.ylabel('Angular velocity [rad/s]', fontsize=18)
+plt.title('Angular velocity | Run {}'.format(run_number), fontsize=24)
+plt.text(0.95, 0.6, 'Rope length: {}\nµ0: {}\nµC: {}'.format(rope_length.__round__(1), friction_constant,
+         friction_constant_2), fontsize=14, ha='right', va='center', transform=plt.gca().transAxes, backgroundcolor='lightgray')
+plt.tight_layout()
+
+if(write_out):
+    df_constant = pd.DataFrame()
+    df_constant['constants'] = ['rope_length', 'u0', 'uc', 'weight']
+    df_constant['values'] = [rope_length,
+                             friction_constant, friction_constant_2, mass_weight]
+    df_constant.set_index('constants', inplace=True)
+    try:
+        os.mkdir(dir)
+        df_run.to_csv('{}/r'.format(dir))
+        df_sim.to_csv('{}/s'.format(dir))
+        df_constant.to_csv('{}/c'.format(dir))
+    except:
+        df_run.to_csv('{}/r'.format(dir))
+        df_sim.to_csv('{}/s'.format(dir))
+        df_constant.to_csv('{}/c'.format(dir))
